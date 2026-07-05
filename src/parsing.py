@@ -111,10 +111,10 @@ class FlightNetworkParser:
             s = s[1:-1].strip()
 
         attrs = {}
-        pattern = r'(\w+)=(?:"([^"]*)"|\'([^\']*)\'|([^\s\\]+))'
+        pattern = r'(\w+)=([^\s\\]+)'
         for match in re.finditer(pattern, s):
             key = match.group(1)
-            val = match.group(2) or match.group(3) or match.group(4)
+            val = match.group(2)
 
             if val.isdigit():
                 attrs[key] = int(val)
@@ -127,8 +127,8 @@ class FlightNetworkParser:
 
     @classmethod
     def _parse_hub(cls, val_str: str) -> Hub:
-        parts = val_str.split(maxsplit=3)
-        if len(parts) < 3:
+        parts = val_str.split(maxsplit=4)
+        if len(parts) < 4:
             raise ValueError(f"Invalid hub format: expected '<name> "
                              f"<x> <y> [attributes]', got '{val_str}'")
 
@@ -140,7 +140,7 @@ class FlightNetworkParser:
             raise ValueError(f"Coordinates must be numbers, "
                              f"got x='{parts[1]}', y='{parts[2]}'")
 
-        attr_str = parts[3] if len(parts) > 3 else ""
+        attr_str = parts[3]
         attributes = cls._parse_attributes(attr_str)
         return Hub(name, x, y, attributes)
 
@@ -231,23 +231,9 @@ class FlightNetworkParser:
 
 
 if __name__ == '__main__':
-    # Default test string based on the user's example
-    test_input = """
-    nb_drones: 5
-    start_hub: hub 0 0 [color=green]
-    end_hub: goal 10 10 [color=yellow]
-    hub: roof1 3 4 [zone=restricted color=red]
-    hub: roof2 6 2 [zone=normal color=blue]
-    hub: corridorA 4 3 [zone=priority color=green max_drones=2]
-    hub: tunnelB 7 4 [zone=normal color=red]
-    hub: obstacleX 5 5 [zone=blocked color=gray]
-    connection: hub-roof1
-    connection: hub-corridorA
-    connection: roof1-roof2
-    connection: roof2-goal
-    connection: corridorA-tunnelB [max_link_capacity=2]
-    connection: tunnelB-goal
-    """
+
+    with open(sys.argv[1], 'r') as file:
+        test_input = file.read()
 
     print("Testing parser with the default example string...")
     try:
