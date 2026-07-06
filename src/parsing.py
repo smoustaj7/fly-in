@@ -1,5 +1,4 @@
 import re
-import sys
 from typing import Dict, Any, List, Optional
 
 
@@ -18,16 +17,18 @@ class Hub:
 
     @property
     def zone(self) -> Optional[str]:
-        return self.attributes.get("zone")
+        return "normal" if self.attributes.get("zone") \
+            is None else self.attributes.get("zone")
 
     @property
     def max_drones(self) -> Optional[int]:
-        val = self.attributes.get("max_drones")
-        return int(val) if val is not None else None
+        return 1 if self.attributes.get("max_drones") \
+            is None else self.attributes.get("max_drones")
 
     def __repr__(self) -> str:
-        return f"Hub(name='{self.name}', x={self.x}, y={self.y}"
-        f", attributes={self.attributes})"
+        return f"Name: {self.name}, x: {self.x}, y: {self.y}" \
+            f", zone: {self.zone}, " \
+            f"color: {self.color}, max_drones: {self.max_drones}\n"
 
 
 class Connection:
@@ -38,13 +39,13 @@ class Connection:
         self.attributes: Dict[str, Any] = attributes
 
     @property
-    def max_link_capacity(self) -> Optional[int]:
+    def max_link_capacity(self) -> int:
         val = self.attributes.get("max_link_capacity")
-        return int(val) if val is not None else None
+        return int(val) if val is not None else 1
 
     def __repr__(self) -> str:
-        return f"Connection(hub1='{self.hub1}', hub2='{self.hub2}'"
-        f", attributes={self.attributes})"
+        return f"Connection(hub1='{self.hub1}', hub2='{self.hub2}'" \
+            f", max_link_capacity={self.max_link_capacity})\n"
 
 
 class FlightNetwork:
@@ -53,11 +54,13 @@ class FlightNetwork:
         self.nb_drones: int = 0
         self.start_hub: Optional[Hub] = None
         self.end_hub: Optional[Hub] = None
-        self.hubs: Dict[str, Hub] = {}
+        self.hubs: list[Hub] = []
         self.connections: List[Connection] = []
 
     def add_hub(self, hub: Hub):
-        self.hubs[hub.name] = hub
+        if any(h.name == hub.name for h in self.hubs):
+            raise ValueError(f"Duplicate hub name: '{hub.name}'")
+        self.hubs.append(hub)
 
     def add_connection(self, connection: Connection):
         self.connections.append(connection)
@@ -72,17 +75,18 @@ class FlightNetwork:
         if self.end_hub is None:
             errors.append("End hub is not defined")
 
-        if self.start_hub and self.start_hub.name not in self.hubs:
+        hub_names = {h.name for h in self.hubs}
+        if self.start_hub and self.start_hub.name not in hub_names:
             errors.append(f"Start hub '{self.start_hub.name}' is defined but "
                           f"missing from the general hubs collection")
-        if self.end_hub and self.end_hub.name not in self.hubs:
+        if self.end_hub and self.end_hub.name not in hub_names:
             errors.append(f"End hub '{self.end_hub.name}' is defined but "
                           f"missing from the general hubs collection")
         for conn in self.connections:
-            if conn.hub1 not in self.hubs:
+            if conn.hub1 not in hub_names:
                 errors.append(f"Connection refers to unknown hub: "
                               f"'{conn.hub1}'")
-            if conn.hub2 not in self.hubs:
+            if conn.hub2 not in hub_names:
                 errors.append(f"Connection refers to unknown "
                               f"hub: '{conn.hub2}'")
 
@@ -94,7 +98,7 @@ class FlightNetwork:
             f"  nb_drones={self.nb_drones},\n"
             f"  start_hub={self.start_hub},\n"
             f"  end_hub={self.end_hub},\n"
-            f"  hubs={list(self.hubs.values())},\n"
+            f"  hubs={self.hubs},\n"
             f"  connections={self.connections}\n"
             f")"
         )
@@ -127,7 +131,7 @@ class FlightNetworkParser:
 
     @classmethod
     def _parse_hub(cls, val_str: str) -> Hub:
-        parts = val_str.split(maxsplit=4)
+        parts = val_str.split(maxsplit=3)
         if len(parts) < 4:
             raise ValueError(f"Invalid hub format: expected '<name> "
                              f"<x> <y> [attributes]', got '{val_str}'")
@@ -197,17 +201,29 @@ class FlightNetworkParser:
                 elif key == 'start_hub':
                     hub = cls._parse_hub(val)
                     network.start_hub = hub
-                    network.add_hub(hub)
+                    try:
+                        network.add_hub(hub)
+                    except ValueError:
+                        print(f"Hub {hub.name} already exists")
+                        exit(1)
                 elif key == 'end_hub':
                     hub = cls._parse_hub(val)
                     network.end_hub = hub
-                    network.add_hub(hub)
+                    try:
+                        network.add_hub(hub)
+                    except ValueError:
+                        print(f"Hub {hub.name} already exists")
+                        exit(1)
                 elif key == 'hub':
                     hub = cls._parse_hub(val)
-                    network.add_hub(hub)
+                    try:
+                        network.add_hub(hub)
+                    except ValueError:
+                        print(f"Hub {hub.name} already exists")
+                        exit(1)
                 elif key == 'connection':
                     conn = cls._parse_connection(
-                        val, list(network.hubs.keys())
+                        val, [h.name for h in network.hubs]
                     )
                     network.add_connection(conn)
                 else:
@@ -228,25 +244,3 @@ class FlightNetworkParser:
         with open(filepath, 'r') as file:
             content = file.read()
         return cls.parse_string(content)
-
-
-if __name__ == '__main__':
-
-    with open(sys.argv[1], 'r') as file:
-        test_input = file.read()
-
-    print("Testing parser with the default example string...")
-    try:
-        network = FlightNetworkParser.parse_string(test_input)
-        print("\nParsing Successful!")
-        print(f"Number of drones: {network.nb_drones}")
-        print(f"Start Hub: {network.start_hub}")
-        print(f"End Hub: {network.end_hub}")
-        print(f"Total parsed hubs: {len(network.hubs)}")
-        print(f"Total connections: {len(network.connections)}")
-        print("\nAll connection details:")
-        for idx, conn in enumerate(network.connections, 1):
-            print(f"  {idx}. {conn.hub1} <--> {conn.hub2} (capacity: {conn.max_link_capacity}, attrs: {conn.attributes})")
-    except Exception as e:
-        print(f"Failed to parse test input: {e}", file=sys.stderr)
-        sys.exit(1)
