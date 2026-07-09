@@ -114,7 +114,7 @@ class FlightNetworkParser:
         if s.startswith('[') and s.endswith(']'):
             s = s[1:-1].strip()
 
-        attrs = {}
+        attrs: Dict[str, Any] = {}
         pattern = r'(\w+)=([^\s\\]+)'
         for match in re.finditer(pattern, s):
             key = match.group(1)
