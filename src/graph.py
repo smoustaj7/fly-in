@@ -1,5 +1,7 @@
 from parsing import FlightNetworkParser
 import sys
+from collections import deque
+from heapq import heappush, heappop
 
 
 class Graph:
@@ -54,6 +56,59 @@ class Graph:
             )
         return graph
 
+    def is_end_reachable(self) -> bool:
+        start = self.network.start_hub.name
+        end = self.network.end_hub.name
 
-g = Graph(FlightNetworkParser.parse_file(sys.argv[1]))
-print(g.graph)
+        visited = {start}
+        queue = deque([start])
+
+        while queue:
+            curr = queue.popleft()
+            if curr == end:
+                return True
+            for edge in self.graph[curr]["edges"]:
+                neighbor = edge[0]
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append(neighbor)
+
+        return False
+
+
+def shortest_path(g: Graph):
+    distance = {hub: float("inf") for hub in g.graph}
+    distance[g.network.start_hub.name] = 0
+    curr = g.network.start_hub.name
+    predecessor = {hub: None for hub in g.graph}
+    visited = set()
+    pq = [(0, curr)]
+    if not g.is_end_reachable():
+        return None, None
+    while curr != g.network.end_hub.name:
+        if curr in visited:
+            curr = heappop(pq)[1]
+            continue
+        for edge in g.graph[curr]["edges"]:
+            neighbor, zone_type, cost, capacity = edge
+            new_dist = distance[curr] + cost
+            if new_dist < distance[neighbor] and neighbor not in visited:
+                distance[neighbor] = new_dist
+                predecessor[neighbor] = curr
+                heappush(pq, (new_dist, neighbor))
+        visited.add(curr)
+        curr = heappop(pq)[1]
+    return distance, predecessor
+
+
+def reconstruct_path(predecessor, start, end):
+    path = []
+    curr = end
+    if predecessor[end] is None and end != start:
+        return None
+    while curr != start:
+        path.append(curr)
+        curr = predecessor[curr]
+    path.append(start)
+    path.reverse()
+    return path
