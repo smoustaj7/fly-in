@@ -32,9 +32,7 @@ def main() -> None:
         print("Usage: python3 -m src <map_file>")
         sys.exit(1)
     network = FlightNetworkParser.parse_file(sys.argv[1])
-    engine = Engine(network)
-    for i in range(network.nb_drones):
-        
+    engine = Engine(network)        
 
 if __name__ == '__main__':
     main()
