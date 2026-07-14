@@ -241,6 +241,11 @@ class FlightNetworkParser:
 
     @classmethod
     def parse_file(cls, filepath: str) -> FlightNetwork:
-        with open(filepath, 'r') as file:
-            content = file.read()
+        try:
+            with open(filepath, 'r') as file:
+                content = file.read()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: '{filepath}'")
+        except Exception as e:
+            raise Exception(f"Error reading file: {e}")
         return cls.parse_string(content)

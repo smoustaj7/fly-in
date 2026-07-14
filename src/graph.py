@@ -82,6 +82,18 @@ class Graph:
 
         return False
 
+    def find_bottlenecks(self):
+        start = self.network.start_hub.name
+        end = self.network.end_hub.name
+        bottlenecks = []
+
+        for node in self.graph:
+            if node == start or node == end:
+                continue
+            if not self.is_end_reachable(start, end, blocked_nodes={node}):
+                bottlenecks.append(node)
+        return bottlenecks
+
 
 def shortest_path(
     g: Graph,
@@ -192,6 +204,7 @@ def k_shortest_paths(g: Graph, K: int):
         B.sort(key=lambda x: x[0])
         A.append(heappop(B))
     return A
+
 
 
 g = Graph(FlightNetworkParser.parse_file(sys.argv[1]))
