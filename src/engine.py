@@ -40,6 +40,29 @@ class SimulationState:
             if zone != start_name:
                 self.zone_occupancy[zone] = 0
 
+    def can_enter_zone(self, zone_name: str, proposed_moves: list[any])\
+            -> bool:
+        max_drones = self.graph.graph[zone_name]["node"]["max_drones"]
+
+        if max_drones is None:
+            return True
+
+        current_occupancy = self.zone_occupancy[zone_name]
+        departing_count = 0
+        for move in proposed_moves:
+            if move[1] != zone_name and \
+                    self.drones[move[0] - 1].location == zone_name:
+                departing_count += 1
+
+        entering_count = 0
+        for move in proposed_moves:
+            if move[1] == zone_name and \
+                    self.drones[move[0] - 1].location != zone_name:
+                entering_count += 1
+
+        return current_occupancy - departing_count + entering_count <= \
+            max_drones
+
 
 class Engine:
     def __init__(self, network: FlightNetwork):
