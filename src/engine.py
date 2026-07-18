@@ -27,6 +27,7 @@ class SimulationState:
     def __init__(self, g: Graph):
         self.graph = g
         self.turn = 0
+        self.reservations = {}
 
         start_name = g.network.start_hub.name
         self.drones = [
@@ -62,6 +63,35 @@ class SimulationState:
 
         return current_occupancy - departing_count + entering_count <= \
             max_drones
+
+    def can_use_connection(
+        self, from_zone: str, to_zone: str, proposed_moves: list[any]
+    ) -> bool:
+        for zone in self.graph.graph[from_zone]["edges"]:
+            if zone[0] == to_zone:
+                max_link_capacity = zone[3]
+                break
+
+        usage_count = 0
+        for m in proposed_moves:
+            if m[1] == to_zone and \
+                    self.drones[m[0] - 1].location == from_zone:
+                usage_count += 1
+
+        return usage_count <= max_link_capacity
+
+    def reserve_arrival(self, zone_name: str, arrival_turn: int) -> bool:
+        if arrival_turn not in self.reservations:
+            self.reservations[arrival_turn] = {}
+        if zone_name not in self.reservations[arrival_turn]:
+            self.reservations[arrival_turn][zone_name] = 0
+
+        if self.graph.graph[zone_name]["node"]["max_drones"] is None or \
+                self.reservations[arrival_turn][zone_name] < \
+                self.graph.graph[zone_name]["node"]["max_drones"]:
+            self.reservations[arrival_turn][zone_name] += 1
+            return True
+        return False
 
 
 class Engine:

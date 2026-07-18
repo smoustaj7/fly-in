@@ -205,7 +205,3 @@ def k_shortest_paths(g: Graph, K: int):
         A.append(heappop(B))
     return A
 
-
-
-g = Graph(FlightNetworkParser.parse_file(sys.argv[1]))
-print(k_shortest_paths(g, 5))
