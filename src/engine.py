@@ -61,8 +61,9 @@ class SimulationState:
                     self.drones[move[0] - 1].location != zone_name:
                 entering_count += 1
 
-        return current_occupancy - departing_count + entering_count <= \
-            max_drones
+        return current_occupancy - departing_count + entering_count + \
+            self.reservations.get(self.turn, {}).get(zone_name, 0) \
+            <= max_drones
 
     def can_use_connection(
         self, from_zone: str, to_zone: str, proposed_moves: list[any]
@@ -93,14 +94,71 @@ class SimulationState:
             return True
         return False
 
+    def validate_moves(self, proposed_moves: list) -> list:
+        legal_moves = []
 
-class Engine:
-    def __init__(self, network: FlightNetwork):
-        self.network = network
-        self.drones: list[Drone] = []
+        for move in proposed_moves:
+            drone_id, destination = move
+            origin = self.drones[drone_id - 1].location
+            zone_type = None
+            for edge in self.graph.graph[origin]["edges"]:
+                if edge[0] == destination:
+                    zone_type = edge[1]
+                    break
+            if zone_type is None:
+                continue
 
-    def run_turn(self):
-        pass
+            candidate_batch = legal_moves + [move]
 
-    def update_drones(self):
-        pass
+            if not self.can_use_connection(
+                origin, destination, candidate_batch
+            ):
+                continue
+            if zone_type == "restricted":
+                if not self.reserve_arrival(destination, self.turn + 2):
+                    continue
+            else:
+                if not self.can_enter_zone(destination, candidate_batch):
+                    continue
+            legal_moves.append(move)
+
+        return legal_moves
+
+    def execute_moves(self, legal_moves: list):
+        moved = []
+        for drone_id, destination in legal_moves:
+            drone = self.drones[drone_id - 1]
+            if self.graph.graph[destination]["node"]["zone"] == "restricted":
+                self.zone_occupancy[drone.location] -= 1
+                drone.status = DroneStatus.IN_TRANSIT
+                drone.location = drone.location + "-" + destination
+                drone.destination = destination
+                drone.arrival_turn = self.turn + 2
+            else:
+                self.zone_occupancy[destination] += 1
+                self.zone_occupancy[drone.location] -= 1
+                if destination == self.graph.network.end_hub.name:
+                    drone.status = DroneStatus.DELIVERED
+                else:
+                    drone.status = DroneStatus.MOVING
+                drone.location = destination
+                moved.append((drone.id, drone.location))
+        for drone in self.drones:
+            if drone.status == DroneStatus.IN_TRANSIT \
+                    and drone.arrival_turn == self.turn:
+                if drone.destination == self.graph.network.end_hub.name:
+                    drone.status = DroneStatus.DELIVERED
+                else:
+                    drone.status = DroneStatus.MOVING
+                drone.location = drone.destination
+                self.zone_occupancy[drone.location] += 1
+                drone.destination = None
+                drone.arrival_turn = None
+                moved.append((drone.id, drone.location))
+        return moved
+
+    def format_output(self, moved: list) -> str:
+        output = []
+        for drone_id, location in moved:
+            output.append(f"D{drone_id}-{location}")
+        return " ".join(output)
