@@ -1,4 +1,3 @@
-from .parsing import FlightNetwork
 from enum import Enum
 from .graph import Graph
 
@@ -124,7 +123,7 @@ class SimulationState:
 
         return legal_moves
 
-    def execute_moves(self, legal_moves: list):
+    def execute_moves(self, legal_moves: list) -> str:
         moved = []
         for drone_id, destination in legal_moves:
             drone = self.drones[drone_id - 1]
@@ -162,3 +161,9 @@ class SimulationState:
         for drone_id, location in moved:
             output.append(f"D{drone_id}-{location}")
         return " ".join(output)
+
+    def is_done(self) -> bool:
+        for drone in self.drones:
+            if drone.status != DroneStatus.DELIVERED:
+                return False
+        return True

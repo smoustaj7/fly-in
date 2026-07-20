@@ -1,7 +1,6 @@
-from parsing import FlightNetworkParser
+from .parsing import FlightNetworkParser
 from collections import deque
 from heapq import heappush, heappop
-import sys
 
 
 class Graph:
@@ -205,3 +204,14 @@ def k_shortest_paths(g: Graph, K: int):
         A.append(heappop(B))
     return A
 
+
+def assign_paths(g: Graph, K: int):
+    paths = k_shortest_paths(g, K)
+    drone_paths = {}
+    for d in range(1, g.network.nb_drones + 1):
+        drone_paths[d] = {
+            "path": paths[d % len(paths)][1],
+            "progress": 0,
+            "stuck_turns": 0
+        }
+    return drone_paths
