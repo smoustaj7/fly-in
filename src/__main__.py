@@ -1,7 +1,8 @@
 from src.graph import shortest_path
 from .engine import SimulationState, DroneStatus
-from .graph import Graph, assign_paths, path_cost, reconstruct_path
+from .graph import Graph, assign_paths, cost, reconstruct_path
 from .parsing import FlightNetworkParser
+from .visualization import Visualizer
 import sys
 
 
@@ -16,6 +17,8 @@ def main():
 def run_simulation(g: Graph, K: int):
     sim = SimulationState(g)
     drone_paths = assign_paths(g, K)
+    visualizer = Visualizer(g)
+    visualizer.render(sim, "(press SPACE to start)")
 
     while not sim.is_done():
         proposed_moves = []
@@ -52,7 +55,7 @@ def run_simulation(g: Graph, K: int):
 
                 if alt_dist is not None and \
                    alt_dist[g.network.end_hub.name] != float("inf"):
-                    remaining_current_cost = path_cost(g, path[progress:])
+                    remaining_current_cost = cost(g, path[progress:])
                     alt_cost = alt_dist[g.network.end_hub.name]
 
                     if alt_cost <= \
@@ -69,6 +72,7 @@ def run_simulation(g: Graph, K: int):
         line = sim.format_output(moved)
         if line:
             print(line)
+        visualizer.render(sim, line)
         sim.turn += 1
     return sim.turn
 
