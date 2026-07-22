@@ -1,12 +1,12 @@
-from src.graph import shortest_path
-from .engine import SimulationState, DroneStatus
-from .graph import Graph, assign_paths, cost, reconstruct_path
-from .parsing import FlightNetworkParser
-from .visualization import Visualizer
 import sys
 
+from .engine import DroneStatus, SimulationState
+from .graph import Graph, assign_paths, cost, reconstruct_path, shortest_path
+from .parsing import FlightNetworkParser
+from .visualization import Visualizer
 
-def main():
+
+def main() -> None:
     parser = FlightNetworkParser()
     network = parser.parse_file(sys.argv[1])
     g = Graph(network)
@@ -14,7 +14,11 @@ def main():
     run_simulation(g, K)
 
 
-def run_simulation(g: Graph, K: int):
+def run_simulation(g: Graph, K: int) -> int:
+    end_hub = g.network.end_hub
+    if end_hub is None:
+        raise ValueError("Simulation requires an end hub")
+
     sim = SimulationState(g)
     drone_paths = assign_paths(g, K)
     visualizer = Visualizer(g)
@@ -49,21 +53,26 @@ def run_simulation(g: Graph, K: int):
                 path, progress = info["path"], info["progress"]
 
                 alt_dist, alt_pred = shortest_path(
-                    g, start_name=drone.location,
+                    g,
+                    start_name=drone.location,
                     blocked_edges={(drone.location, next_hop)}
                 )
 
                 if alt_dist is not None and \
-                   alt_dist[g.network.end_hub.name] != float("inf"):
+                   alt_dist[end_hub.name] != float("inf"):
                     remaining_current_cost = cost(g, path[progress:])
-                    alt_cost = alt_dist[g.network.end_hub.name]
+                    alt_cost = alt_dist[end_hub.name]
 
                     if alt_cost <= \
                        remaining_current_cost + info["stuck_turns"]:
-                        alt_path = reconstruct_path(
-                            alt_pred, drone.location, g.network.end_hub.name
-                        )
-                        info["path"] = alt_path
+                        if alt_pred is not None:
+                            alt_path = reconstruct_path(
+                                alt_pred,
+                                drone.location,
+                                end_hub.name
+                            )
+                            if alt_path is not None:
+                                info["path"] = alt_path
                         info["progress"] = 0
                         info["stuck_turns"] = 0
         moved = sim.execute_moves(legal_moves)

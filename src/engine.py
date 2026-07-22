@@ -1,4 +1,6 @@
 from enum import Enum
+from typing import Optional, Any
+
 from .graph import Graph
 
 
@@ -10,38 +12,44 @@ class DroneStatus(Enum):
 
 
 class Drone:
-    def __init__(self, drone_id: int, start_zone: str):
+    def __init__(self, drone_id: int, start_zone: str) -> None:
         self.id = drone_id
         self.status = DroneStatus.WAITING
         self.location = start_zone
-        self.destination = None
-        self.arrival_turn = None
+        self.destination: Optional[str] = None
+        self.arrival_turn: Optional[int] = None
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Drone(id={self.id}, status={self.status.value}," \
             f" location={self.location})"
 
 
 class SimulationState:
-    def __init__(self, g: Graph):
+    def __init__(self, g: Graph) -> None:
         self.graph = g
         self.turn = 0
-        self.reservations = {}
+        self.reservations: dict[int, dict[str, int]] = {}
 
-        start_name = g.network.start_hub.name
-        self.drones = [
+        start_hub = g.network.start_hub
+        if start_hub is None:
+            raise ValueError("Simulation requires a start hub")
+        start_name = start_hub.name
+        self.drones: list[Drone] = [
             Drone(drone_id=i, start_zone=start_name)
             for i in range(1, g.network.nb_drones + 1)
         ]
 
-        self.zone_occupancy = {}
+        self.zone_occupancy: dict[str, int] = {}
         self.zone_occupancy[start_name] = g.network.nb_drones
         for zone in g.graph:
             if zone != start_name:
                 self.zone_occupancy[zone] = 0
 
-    def can_enter_zone(self, zone_name: str, proposed_moves: list[any])\
-            -> bool:
+    def can_enter_zone(
+        self,
+        zone_name: str,
+        proposed_moves: list[tuple[int, str]]
+    ) -> Any:
         max_drones = self.graph.graph[zone_name]["node"]["max_drones"]
 
         if max_drones is None:
@@ -65,12 +73,17 @@ class SimulationState:
             <= max_drones
 
     def can_use_connection(
-        self, from_zone: str, to_zone: str, proposed_moves: list[any]
-    ) -> bool:
+        self,
+        from_zone: str,
+        to_zone: str,
+        proposed_moves: list[tuple[int, str]]
+    ) -> Any:
         for zone in self.graph.graph[from_zone]["edges"]:
             if zone[0] == to_zone:
                 max_link_capacity = zone[3]
                 break
+        else:
+            return False
 
         usage_count = 0
         for m in proposed_moves:
@@ -93,13 +106,16 @@ class SimulationState:
             return True
         return False
 
-    def validate_moves(self, proposed_moves: list) -> list:
-        legal_moves = []
+    def validate_moves(
+        self,
+        proposed_moves: list[tuple[int, str]]
+            ) -> list[tuple[int, str]]:
+        legal_moves: list[tuple[int, str]] = []
 
         for move in proposed_moves:
             drone_id, destination = move
             origin = self.drones[drone_id - 1].location
-            zone_type = None
+            zone_type: Optional[str] = None
             for edge in self.graph.graph[origin]["edges"]:
                 if edge[0] == destination:
                     zone_type = edge[1]
@@ -123,8 +139,11 @@ class SimulationState:
 
         return legal_moves
 
-    def execute_moves(self, legal_moves: list) -> str:
-        moved = []
+    def execute_moves(
+        self,
+        legal_moves: list[tuple[int, str]]
+            ) -> list[tuple[int, str]]:
+        moved: list[tuple[int, str]] = []
         for drone_id, destination in legal_moves:
             drone = self.drones[drone_id - 1]
             if self.graph.graph[destination]["node"]["zone"] == "restricted":
@@ -134,30 +153,39 @@ class SimulationState:
                 drone.destination = destination
                 drone.arrival_turn = self.turn + 2
             else:
+                end_hub = self.graph.network.end_hub
+                if end_hub is None:
+                    raise ValueError("Simulation requires an end hub")
                 self.zone_occupancy[destination] += 1
                 self.zone_occupancy[drone.location] -= 1
-                if destination == self.graph.network.end_hub.name:
+                if destination == end_hub.name:
                     drone.status = DroneStatus.DELIVERED
                 else:
                     drone.status = DroneStatus.MOVING
                 drone.location = destination
                 moved.append((drone.id, drone.location))
+        end_hub = self.graph.network.end_hub
+        if end_hub is None:
+            raise ValueError("Simulation requires an end hub")
         for drone in self.drones:
             if drone.status == DroneStatus.IN_TRANSIT \
                     and drone.arrival_turn == self.turn:
-                if drone.destination == self.graph.network.end_hub.name:
+                if drone.destination == end_hub.name:
                     drone.status = DroneStatus.DELIVERED
                 else:
                     drone.status = DroneStatus.MOVING
-                drone.location = drone.destination
+                destination_name = drone.destination
+                if destination_name is None:
+                    continue
+                drone.location = destination_name
                 self.zone_occupancy[drone.location] += 1
                 drone.destination = None
                 drone.arrival_turn = None
                 moved.append((drone.id, drone.location))
         return moved
 
-    def format_output(self, moved: list) -> str:
-        output = []
+    def format_output(self, moved: list[tuple[int, str]]) -> str:
+        output: list[str] = []
         for drone_id, location in moved:
             output.append(f"D{drone_id}-{location}")
         return " ".join(output)

@@ -5,7 +5,7 @@ from typing import Dict, Any, List, Optional
 class Hub:
 
     def __init__(self, name: str, x: float, y: float,
-                 attributes: Dict[str, Any]):
+                 attributes: Dict[str, Any]) -> None:
         self.name: str = name
         self.x: float = x
         self.y: float = y
@@ -33,7 +33,12 @@ class Hub:
 
 class Connection:
 
-    def __init__(self, hub1: str, hub2: str, attributes: Dict[str, Any]):
+    def __init__(
+        self,
+        hub1: str,
+        hub2: str,
+        attributes: Dict[str, Any]
+            ) -> None:
         self.hub1: str = hub1
         self.hub2: str = hub2
         self.attributes: Dict[str, Any] = attributes
@@ -50,19 +55,19 @@ class Connection:
 
 class FlightNetwork:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nb_drones: int = 0
         self.start_hub: Optional[Hub] = None
         self.end_hub: Optional[Hub] = None
         self.hubs: list[Hub] = []
         self.connections: List[Connection] = []
 
-    def add_hub(self, hub: Hub):
+    def add_hub(self, hub: Hub) -> None:
         if any(h.name == hub.name for h in self.hubs):
             raise ValueError(f"Duplicate hub name: '{hub.name}'")
         self.hubs.append(hub)
 
-    def add_connection(self, connection: Connection):
+    def add_connection(self, connection: Connection) -> None:
         self.connections.append(connection)
 
     def validate(self) -> List[str]:

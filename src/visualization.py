@@ -1,7 +1,10 @@
 import sys
+from typing import Any
+
 import pygame
+
+from src.engine import DroneStatus, SimulationState
 from src.graph import Graph
-from src.engine import SimulationState, DroneStatus
 
 ZONE_TYPE_COLORS = {
     "normal": pygame.Color("forestgreen"),
@@ -56,7 +59,7 @@ def compute_positions(
     ys = [hub.y for hub in network.hubs]
     min_x, min_y = min(xs), min(ys)
 
-    positions = {}
+    positions: dict[str, tuple[int, int]] = {}
     for hub in network.hubs:
         positions[hub.name] = (
             int((hub.x - min_x) * scale) + MARGIN,
@@ -65,7 +68,7 @@ def compute_positions(
     return positions
 
 
-def draw_clouds(screen: pygame.Surface, width: int, height: int) -> None:
+def draw_clouds(screen: Any, width: int, height: int) -> None:
     cloud_specs = [
         (0.08, 0.10, 1.0), (0.32, 0.06, 0.8), (0.60, 0.12, 1.1),
         (0.80, 0.05, 0.7), (0.18, 0.20, 0.6), (0.48, 0.18, 0.9),
@@ -83,16 +86,16 @@ def draw_clouds(screen: pygame.Surface, width: int, height: int) -> None:
 
 
 def compute_label_sides(network: Graph) -> dict[str, str]:
-    sides = {}
+    sides: dict[str, str] = {}
     for i, hub in enumerate(network.hubs):
         sides[hub.name] = "above" if i % 2 == 0 else "below"
     return sides
 
 
 def draw_frame(
-    screen: pygame.Surface,
-    font: pygame.font.SysFont,
-    id_font: pygame.font.SysFont,
+    screen: Any,
+    font: Any,
+    id_font: Any,
     g: Graph,
     sim: SimulationState,
     positions: dict[str, tuple[int, int]],
@@ -113,7 +116,7 @@ def draw_frame(
 
     for zone_name in g.graph:
         pos = positions[zone_name]
-        color = get_zone_color(zone_name, g.network)
+        color = get_zone_color(zone_name, g)
         pygame.draw.circle(screen, color, pos, ZONE_RADIUS)
         pygame.draw.circle(screen, pygame.Color("gray5"), pos, ZONE_RADIUS, 2)
 
@@ -131,7 +134,7 @@ def draw_frame(
         pygame.draw.rect(screen, LABEL_BG, bg_rect, border_radius=3)
         screen.blit(label, (label_x, label_y))
 
-    zone_drone_count = {}
+    zone_drone_count: dict[str, int] = {}
     for drone in sim.drones:
         if drone.status == DroneStatus.DELIVERED:
             continue
@@ -185,8 +188,8 @@ class Visualizer:
         self.id_font = pygame.font.SysFont("monospace", 13, bold=True)
         self.g = g
 
-        self.positions = compute_positions(g.network, compute_scale(g.network))
-        self.label_sides = compute_label_sides(g.network)
+        self.positions = compute_positions(g, compute_scale(g))
+        self.label_sides = compute_label_sides(g)
         max_x = int(max(p[0] for p in self.positions.values()) + MARGIN)
         max_y = int(max(p[1] for p in self.positions.values()) + MARGIN)
         self.screen = pygame.display.set_mode((max_x, max_y))
@@ -195,7 +198,7 @@ class Visualizer:
         self.clock = pygame.time.Clock()
         self.waiting = True
 
-    def render(self, sim: SimulationState, turn_line: str):
+    def render(self, sim: SimulationState, turn_line: str) -> None:
         draw_frame(
             self.screen, self.font, self.id_font, self.g, sim,
             self.positions, self.label_sides, turn_line or "(no movement)"
