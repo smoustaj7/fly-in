@@ -27,7 +27,7 @@ class Drone:
 class SimulationState:
     def __init__(self, g: Graph) -> None:
         self.graph = g
-        self.turn = 0
+        self.turn = 1
         self.reservations: dict[int, dict[str, int]] = {}
 
         start_hub = g.network.start_hub
@@ -130,7 +130,7 @@ class SimulationState:
             ):
                 continue
             if zone_type == "restricted":
-                if not self.reserve_arrival(destination, self.turn + 2):
+                if not self.reserve_arrival(destination, self.turn + 1):
                     continue
             else:
                 if not self.can_enter_zone(destination, candidate_batch):
@@ -151,7 +151,7 @@ class SimulationState:
                 drone.status = DroneStatus.IN_TRANSIT
                 drone.location = drone.location + "-" + destination
                 drone.destination = destination
-                drone.arrival_turn = self.turn + 2
+                drone.arrival_turn = self.turn + 1
             else:
                 end_hub = self.graph.network.end_hub
                 if end_hub is None:
@@ -182,8 +182,6 @@ class SimulationState:
                 drone.destination = None
                 drone.arrival_turn = None
                 moved.append((drone.id, drone.location))
-        if self.turn == 0:
-            self.turn += 1
         return moved
 
     def format_output(self, moved: list[tuple[int, str]]) -> str:

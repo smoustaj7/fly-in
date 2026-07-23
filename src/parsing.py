@@ -46,7 +46,14 @@ class Connection:
     @property
     def max_link_capacity(self) -> int:
         val = self.attributes.get("max_link_capacity")
-        return int(val) if val is not None else 1
+        if val is None:
+            return 1
+        if isinstance(val, int):
+            return val
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return -1
 
     def __repr__(self) -> str:
         return f"Connection(hub1='{self.hub1}', hub2='{self.hub2}'" \
@@ -54,6 +61,7 @@ class Connection:
 
 
 class FlightNetwork:
+    VALID_ZONES = {"normal", "priority", "restricted", "blocked"}
 
     def __init__(self) -> None:
         self.nb_drones: int = 0
@@ -68,6 +76,14 @@ class FlightNetwork:
         self.hubs.append(hub)
 
     def add_connection(self, connection: Connection) -> None:
+        if connection.hub1 == connection.hub2:
+            raise ValueError(f"Invalid connection: hub '{connection.hub1}' "
+                             f"cannot connect to itself")
+        for c in self.connections:
+            if {c.hub1, c.hub2} == {connection.hub1, connection.hub2}:
+                raise ValueError(f"Duplicate connection between "
+                                 f"'{connection.hub1}' and "
+                                 f"'{connection.hub2}'")
         self.connections.append(connection)
 
     def validate(self) -> List[str]:
@@ -87,6 +103,16 @@ class FlightNetwork:
         if self.end_hub and self.end_hub.name not in hub_names:
             errors.append(f"End hub '{self.end_hub.name}' is defined but "
                           f"missing from the general hubs collection")
+
+        for hub in self.hubs:
+            if hub.zone not in self.VALID_ZONES:
+                valid_str = ", ".join(sorted(self.VALID_ZONES))
+                errors.append(f"Hub '{hub.name}' has invalid zone type: "
+                              f"'{hub.zone}'. Valid zones are: {valid_str}")
+            if hub.max_drones is not None and hub.max_drones <= 0:
+                errors.append(f"Hub '{hub.name}' has invalid max_drones: "
+                              f"{hub.max_drones} (must be a positive integer)")
+
         for conn in self.connections:
             if conn.hub1 not in hub_names:
                 errors.append(f"Connection refers to unknown hub: "
@@ -94,6 +120,11 @@ class FlightNetwork:
             if conn.hub2 not in hub_names:
                 errors.append(f"Connection refers to unknown "
                               f"hub: '{conn.hub2}'")
+            if conn.max_link_capacity <= 0:
+                errors.append(f"Connection '{conn.hub1}-{conn.hub2}' has "
+                              f"invalid max_link_capacity: "
+                              f"{conn.max_link_capacity} (must be a positive "
+                              f"integer)")
 
         return errors
 
@@ -125,9 +156,9 @@ class FlightNetworkParser:
             key = match.group(1)
             val = match.group(2)
 
-            if val.isdigit():
+            try:
                 attrs[key] = int(val)
-            else:
+            except ValueError:
                 try:
                     attrs[key] = float(val)
                 except ValueError:
@@ -137,7 +168,7 @@ class FlightNetworkParser:
     @classmethod
     def _parse_hub(cls, val_str: str) -> Hub:
         parts = val_str.split(maxsplit=3)
-        if len(parts) < 4:
+        if len(parts) < 3:
             raise ValueError(f"Invalid hub format: expected '<name> "
                              f"<x> <y> [attributes]', got '{val_str}'")
 
@@ -149,7 +180,7 @@ class FlightNetworkParser:
             raise ValueError(f"Coordinates must be numbers, "
                              f"got x='{parts[1]}', y='{parts[2]}'")
 
-        attr_str = parts[3]
+        attr_str = parts[3] if len(parts) > 3 else ""
         attributes = cls._parse_attributes(attr_str)
         return Hub(name, x, y, attributes)
 
@@ -206,26 +237,14 @@ class FlightNetworkParser:
                 elif key == 'start_hub':
                     hub = cls._parse_hub(val)
                     network.start_hub = hub
-                    try:
-                        network.add_hub(hub)
-                    except ValueError:
-                        print(f"Hub {hub.name} already exists")
-                        exit(1)
+                    network.add_hub(hub)
                 elif key == 'end_hub':
                     hub = cls._parse_hub(val)
                     network.end_hub = hub
-                    try:
-                        network.add_hub(hub)
-                    except ValueError:
-                        print(f"Hub {hub.name} already exists")
-                        exit(1)
+                    network.add_hub(hub)
                 elif key == 'hub':
                     hub = cls._parse_hub(val)
-                    try:
-                        network.add_hub(hub)
-                    except ValueError:
-                        print(f"Hub {hub.name} already exists")
-                        exit(1)
+                    network.add_hub(hub)
                 elif key == 'connection':
                     conn = cls._parse_connection(
                         val, [h.name for h in network.hubs]
