@@ -182,6 +182,8 @@ class SimulationState:
                 drone.destination = None
                 drone.arrival_turn = None
                 moved.append((drone.id, drone.location))
+        if self.turn == 0:
+            self.turn += 1
         return moved
 
     def format_output(self, moved: list[tuple[int, str]]) -> str:
